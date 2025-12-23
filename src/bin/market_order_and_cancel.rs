@@ -2,8 +2,8 @@ use std::{thread::sleep, time::Duration};
 
 use alloy::signers::local::PrivateKeySigner;
 use hyperliquid_rust_sdk::{
-    BaseUrl, ExchangeClient, ExchangeDataStatus, ExchangeResponseStatus, MarketCloseParams,
-    MarketOrderParams,
+    ExchangeClient, ExchangeDataStatus, ExchangeResponseStatus, HyperliquidChain,
+    MarketCloseParams, MarketOrderParams,
 };
 use log::info;
 
@@ -16,9 +16,10 @@ async fn main() {
             .parse()
             .unwrap();
 
-    let exchange_client = ExchangeClient::new(None, wallet, Some(BaseUrl::Testnet), None, None)
-        .await
-        .unwrap();
+    let exchange_client =
+        ExchangeClient::new(None, wallet, Some(HyperliquidChain::Testnet), None, None)
+            .await
+            .unwrap();
 
     // Market open order
     let market_open_params = MarketOrderParams {

@@ -2,7 +2,8 @@ use std::{thread::sleep, time::Duration};
 
 use alloy::signers::local::PrivateKeySigner;
 use hyperliquid_rust_sdk::{
-    BaseUrl, ClientCancelRequestCloid, ClientLimit, ClientOrder, ClientOrderRequest, ExchangeClient,
+    ClientCancelRequestCloid, ClientLimit, ClientOrder, ClientOrderRequest, ExchangeClient,
+    HyperliquidChain,
 };
 use log::info;
 use uuid::Uuid;
@@ -16,9 +17,10 @@ async fn main() {
             .parse()
             .unwrap();
 
-    let exchange_client = ExchangeClient::new(None, wallet, Some(BaseUrl::Testnet), None, None)
-        .await
-        .unwrap();
+    let exchange_client =
+        ExchangeClient::new(None, wallet, Some(HyperliquidChain::Testnet), None, None)
+            .await
+            .unwrap();
 
     // Order and Cancel with cloid
     let cloid = Uuid::new_v4();

@@ -2,8 +2,8 @@ use alloy::signers::local::PrivateKeySigner;
 use log::info;
 
 use hyperliquid_rust_sdk::{
-    BaseUrl, ClientLimit, ClientOrder, ClientOrderRequest, ExchangeClient, ExchangeDataStatus,
-    ExchangeResponseStatus,
+    ClientLimit, ClientOrder, ClientOrderRequest, ExchangeClient, ExchangeDataStatus,
+    ExchangeResponseStatus, HyperliquidChain,
 };
 use std::{thread::sleep, time::Duration};
 
@@ -16,9 +16,10 @@ async fn main() {
             .parse()
             .unwrap();
 
-    let exchange_client = ExchangeClient::new(None, wallet, Some(BaseUrl::Testnet), None, None)
-        .await
-        .unwrap();
+    let exchange_client =
+        ExchangeClient::new(None, wallet, Some(HyperliquidChain::Testnet), None, None)
+            .await
+            .unwrap();
 
     info!("Testing Schedule Cancel Dead Man's Switch functionality...");
 

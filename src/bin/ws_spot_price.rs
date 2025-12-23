@@ -1,13 +1,15 @@
 use std::time::Duration;
 
-use hyperliquid_rust_sdk::{BaseUrl, InfoClient, Message, Subscription};
+use hyperliquid_rust_sdk::{HyperliquidChain, InfoClient, Message, Subscription};
 use log::info;
 use tokio::{spawn, sync::mpsc::unbounded_channel, time::sleep};
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
-    let mut info_client = InfoClient::new(None, Some(BaseUrl::Mainnet)).await.unwrap();
+    let mut info_client = InfoClient::new(None, Some(HyperliquidChain::Mainnet))
+        .await
+        .unwrap();
 
     let (sender, mut receiver) = unbounded_channel();
     let subscription_id = info_client

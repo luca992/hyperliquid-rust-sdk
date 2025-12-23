@@ -6,9 +6,11 @@ use alloy::{
 use serde::{Deserialize, Serialize, Serializer};
 
 use super::{cancel::CancelRequestCloid, BuilderInfo};
+use crate::helpers::next_nonce;
 use crate::{
     eip712::Eip712,
     exchange::{cancel::CancelRequest, modify::ModifyRequest, order::OrderRequest},
+    HyperliquidChain,
 };
 
 fn eip_712_domain(chain_id: u64) -> Eip712Domain {
@@ -27,13 +29,29 @@ where
     s.serialize_str(&format!("0x{val:x}"))
 }
 
-#[derive(Debug, Clone, Deserialize)]
+fn default_signature_chain_id(
+    hyperliquid_chain: &HyperliquidChain,
+    signature_chain_id: Option<u64>,
+) -> u64 {
+    match signature_chain_id {
+        Some(signature_chain_id) => signature_chain_id,
+        None => {
+            if hyperliquid_chain.is_mainnet() {
+                42161 // Arbitrum One
+            } else {
+                421614 // Arbitrum Sepolia
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct MultiSigExtension {
     pub payload_multi_sig_user: String,
     pub outer_signer: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct UsdSend {
     #[serde(serialize_with = "serialize_hex")]
@@ -42,6 +60,24 @@ pub struct UsdSend {
     pub destination: String,
     pub amount: String,
     pub time: u64,
+}
+
+impl UsdSend {
+    pub fn new(
+        hyperliquid_chain: HyperliquidChain,
+        destination: String,
+        amount: String,
+        signature_chain_id: Option<u64>,
+    ) -> Self {
+        let signature_chain_id = default_signature_chain_id(&hyperliquid_chain, signature_chain_id);
+        Self {
+            signature_chain_id,
+            hyperliquid_chain: hyperliquid_chain.action_chain_name(),
+            destination,
+            amount,
+            time: next_nonce(),
+        }
+    }
 }
 
 impl Eip712 for UsdSend {
@@ -115,6 +151,24 @@ pub struct ApproveAgent {
     pub nonce: u64,
 }
 
+impl ApproveAgent {
+    pub fn new(
+        hyperliquid_chain: HyperliquidChain,
+        agent_address: Address,
+        agent_name: Option<String>,
+        signature_chain_id: Option<u64>,
+    ) -> Self {
+        let signature_chain_id = default_signature_chain_id(&hyperliquid_chain, signature_chain_id);
+        Self {
+            signature_chain_id,
+            hyperliquid_chain: hyperliquid_chain.action_chain_name(),
+            agent_address,
+            agent_name,
+            nonce: next_nonce(),
+        }
+    }
+}
+
 impl Eip712 for ApproveAgent {
     fn domain(&self) -> Eip712Domain {
         eip_712_domain(self.signature_chain_id)
@@ -132,7 +186,7 @@ impl Eip712 for ApproveAgent {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Withdraw3 {
     #[serde(serialize_with = "serialize_hex")]
@@ -141,6 +195,24 @@ pub struct Withdraw3 {
     pub destination: String,
     pub amount: String,
     pub time: u64,
+}
+
+impl Withdraw3 {
+    pub fn new(
+        hyperliquid_chain: HyperliquidChain,
+        destination: String,
+        amount: String,
+        signature_chain_id: Option<u64>,
+    ) -> Self {
+        let signature_chain_id = default_signature_chain_id(&hyperliquid_chain, signature_chain_id);
+        Self {
+            signature_chain_id,
+            hyperliquid_chain: hyperliquid_chain.action_chain_name(),
+            destination,
+            amount,
+            time: next_nonce(),
+        }
+    }
 }
 
 impl Eip712 for Withdraw3 {
@@ -170,6 +242,26 @@ pub struct SpotSend {
     pub token: String,
     pub amount: String,
     pub time: u64,
+}
+
+impl SpotSend {
+    pub fn new(
+        hyperliquid_chain: HyperliquidChain,
+        destination: String,
+        token: String,
+        amount: String,
+        signature_chain_id: Option<u64>,
+    ) -> Self {
+        let signature_chain_id = default_signature_chain_id(&hyperliquid_chain, signature_chain_id);
+        Self {
+            signature_chain_id,
+            hyperliquid_chain: hyperliquid_chain.action_chain_name(),
+            destination,
+            token,
+            amount,
+            time: next_nonce(),
+        }
+    }
 }
 
 impl Eip712 for SpotSend {
@@ -203,7 +295,7 @@ pub struct ClassTransfer {
     pub to_perp: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SendAsset {
     #[serde(serialize_with = "serialize_hex")]
@@ -218,6 +310,35 @@ pub struct SendAsset {
     pub nonce: u64,
     #[serde(skip)]
     pub multi_sig_ext: Option<MultiSigExtension>,
+}
+
+impl SendAsset {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        hyperliquid_chain: HyperliquidChain,
+        destination: String,
+        source_dex: String,
+        destination_dex: String,
+        token: String,
+        amount: String,
+        from_sub_account: String,
+        multi_sig_ext: Option<MultiSigExtension>,
+        signature_chain_id: Option<u64>,
+    ) -> Self {
+        let signature_chain_id = default_signature_chain_id(&hyperliquid_chain, signature_chain_id);
+        Self {
+            signature_chain_id,
+            hyperliquid_chain: hyperliquid_chain.action_chain_name(),
+            destination,
+            source_dex,
+            destination_dex,
+            token,
+            amount,
+            from_sub_account,
+            nonce: next_nonce(),
+            multi_sig_ext,
+        }
+    }
 }
 
 impl Eip712 for SendAsset {
@@ -281,7 +402,7 @@ pub struct EvmUserModify {
     pub using_big_blocks: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ApproveBuilderFee {
     #[serde(serialize_with = "serialize_hex")]
@@ -290,6 +411,24 @@ pub struct ApproveBuilderFee {
     pub builder: Address,
     pub max_fee_rate: String,
     pub nonce: u64,
+}
+
+impl ApproveBuilderFee {
+    pub fn new(
+        hyperliquid_chain: HyperliquidChain,
+        builder: Address,
+        max_fee_rate: String,
+        signature_chain_id: Option<u64>,
+    ) -> Self {
+        let signature_chain_id = default_signature_chain_id(&hyperliquid_chain, signature_chain_id);
+        Self {
+            signature_chain_id,
+            hyperliquid_chain: hyperliquid_chain.action_chain_name(),
+            builder,
+            max_fee_rate,
+            nonce: next_nonce(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -323,7 +462,7 @@ impl Eip712 for ApproveBuilderFee {
 // Multi-sig related structs
 
 /// Convert a regular user account to a multi-sig account
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConvertToMultiSig {
     #[serde(serialize_with = "serialize_hex")]
@@ -331,6 +470,22 @@ pub struct ConvertToMultiSig {
     pub hyperliquid_chain: String,
     pub multi_sig_threshold: u64,
     pub time: u64,
+}
+
+impl ConvertToMultiSig {
+    pub fn new(
+        hyperliquid_chain: HyperliquidChain,
+        multi_sig_threshold: u64,
+        signature_chain_id: Option<u64>,
+    ) -> Self {
+        let signature_chain_id = default_signature_chain_id(&hyperliquid_chain, signature_chain_id);
+        Self {
+            signature_chain_id,
+            hyperliquid_chain: hyperliquid_chain.action_chain_name(),
+            multi_sig_threshold,
+            time: next_nonce(),
+        }
+    }
 }
 
 impl Eip712 for ConvertToMultiSig {
@@ -349,7 +504,7 @@ impl Eip712 for ConvertToMultiSig {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateMultiSigAddresses {
     #[serde(serialize_with = "serialize_hex")]
@@ -358,6 +513,24 @@ pub struct UpdateMultiSigAddresses {
     pub to_add: Vec<Address>,
     pub to_remove: Vec<Address>,
     pub time: u64,
+}
+
+impl UpdateMultiSigAddresses {
+    pub fn new(
+        hyperliquid_chain: HyperliquidChain,
+        to_add: Vec<Address>,
+        to_remove: Vec<Address>,
+        signature_chain_id: Option<u64>,
+    ) -> Self {
+        let signature_chain_id = default_signature_chain_id(&hyperliquid_chain, signature_chain_id);
+        Self {
+            signature_chain_id,
+            hyperliquid_chain: hyperliquid_chain.action_chain_name(),
+            to_add,
+            to_remove,
+            time: next_nonce(),
+        }
+    }
 }
 
 impl Eip712 for UpdateMultiSigAddresses {
@@ -407,5 +580,161 @@ impl Eip712 for MultiSigEnvelope {
             &self.nonce,
         );
         keccak256(items.abi_encode())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prelude::Result;
+    use crate::HyperliquidChain;
+    use alloy::primitives::address;
+
+    #[test]
+    fn test_usd_send_new_helper() -> Result<()> {
+        let with_helper = UsdSend::new(
+            HyperliquidChain::Testnet,
+            "0x0D1d9635D0640821d15e323ac8AdADfA9c111414".to_string(),
+            "1".to_string(),
+            None,
+        );
+        let time = with_helper.time;
+
+        let manual = UsdSend {
+            signature_chain_id: 421614,
+            hyperliquid_chain: "Testnet".to_string(),
+            destination: "0x0D1d9635D0640821d15e323ac8AdADfA9c111414".to_string(),
+            amount: "1".to_string(),
+            time,
+        };
+
+        assert_eq!(manual, with_helper);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_withdraw3_new_helper() -> Result<()> {
+        let with_helper = Withdraw3::new(
+            HyperliquidChain::Testnet,
+            "0x0D1d9635D0640821d15e323ac8AdADfA9c111414".to_string(),
+            "1".to_string(),
+            None,
+        );
+        let time = with_helper.time;
+
+        let manual = Withdraw3 {
+            signature_chain_id: 421614,
+            hyperliquid_chain: "Testnet".to_string(),
+            destination: "0x0D1d9635D0640821d15e323ac8AdADfA9c111414".to_string(),
+            amount: "1".to_string(),
+            time,
+        };
+
+        assert_eq!(manual, with_helper);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_approve_builder_fee_new_helper() -> Result<()> {
+        let with_helper = ApproveBuilderFee::new(
+            HyperliquidChain::Testnet,
+            address!("0x1234567890123456789012345678901234567890"),
+            "0.001%".to_string(),
+            None,
+        );
+        let nonce = with_helper.nonce;
+
+        let manual = ApproveBuilderFee {
+            signature_chain_id: 421614,
+            hyperliquid_chain: "Testnet".to_string(),
+            builder: address!("0x1234567890123456789012345678901234567890"),
+            max_fee_rate: "0.001%".to_string(),
+            nonce,
+        };
+
+        assert_eq!(manual, with_helper);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_send_asset_new_helper() -> Result<()> {
+        let with_helper = SendAsset::new(
+            HyperliquidChain::Testnet,
+            "0x1234567890123456789012345678901234567890".to_string(),
+            "spot".to_string(),
+            "".to_string(),
+            "USDC".to_string(),
+            "50".to_string(),
+            "".to_string(),
+            None,
+            None,
+        );
+        let nonce = with_helper.nonce;
+
+        let manual = SendAsset {
+            signature_chain_id: 421614,
+            hyperliquid_chain: "Testnet".to_string(),
+            destination: "0x1234567890123456789012345678901234567890".to_string(),
+            source_dex: "spot".to_string(),
+            destination_dex: "".to_string(),
+            token: "USDC".to_string(),
+            amount: "50".to_string(),
+            from_sub_account: "".to_string(),
+            nonce,
+            multi_sig_ext: None,
+        };
+
+        assert_eq!(manual, with_helper);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_convert_to_multi_sig_new_helper() -> Result<()> {
+        let with_helper = ConvertToMultiSig::new(HyperliquidChain::Testnet, 1, None);
+        let time = with_helper.time;
+
+        let manual = ConvertToMultiSig {
+            signature_chain_id: 421614,
+            hyperliquid_chain: "Testnet".to_string(),
+            multi_sig_threshold: 1,
+            time,
+        };
+
+        assert_eq!(manual, with_helper);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_update_multi_sig_addresses_new_helper() -> Result<()> {
+        let with_helper = UpdateMultiSigAddresses::new(
+            HyperliquidChain::Testnet,
+            vec![
+                address!("0x0D1d9635D0640821d15e323ac8AdADfA9c111414"),
+                address!("0x1234567890123456789012345678901234567890"),
+            ],
+            vec![address!("0xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd")],
+            None,
+        );
+        let time = with_helper.time;
+
+        let manual = UpdateMultiSigAddresses {
+            signature_chain_id: 421614,
+            hyperliquid_chain: "Testnet".to_string(),
+            to_add: vec![
+                address!("0x0D1d9635D0640821d15e323ac8AdADfA9c111414"),
+                address!("0x1234567890123456789012345678901234567890"),
+            ],
+            to_remove: vec![address!("0xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd")],
+            time,
+        };
+
+        assert_eq!(manual, with_helper);
+
+        Ok(())
     }
 }

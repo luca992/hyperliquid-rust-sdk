@@ -1,5 +1,5 @@
 use alloy::primitives::address;
-use hyperliquid_rust_sdk::{BaseUrl, InfoClient, Message, Subscription};
+use hyperliquid_rust_sdk::{HyperliquidChain, InfoClient, Message, Subscription};
 use log::info;
 use tokio::{
     spawn,
@@ -10,7 +10,9 @@ use tokio::{
 #[tokio::main]
 async fn main() {
     env_logger::init();
-    let mut info_client = InfoClient::new(None, Some(BaseUrl::Testnet)).await.unwrap();
+    let mut info_client = InfoClient::new(None, Some(HyperliquidChain::Testnet))
+        .await
+        .unwrap();
     let user = address!("0xc64cc00b46101bd40aa1c3121195e85c0b0918d8");
 
     let (sender, mut receiver) = unbounded_channel();

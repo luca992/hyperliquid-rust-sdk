@@ -1,7 +1,7 @@
 use reqwest::{Client, Response};
 use serde::Deserialize;
 
-use crate::{prelude::*, BaseUrl, Error};
+use crate::{prelude::*, Error, HyperliquidChain};
 
 #[derive(Deserialize, Debug)]
 struct ErrorData {
@@ -13,7 +13,7 @@ struct ErrorData {
 #[derive(Debug)]
 pub struct HttpClient {
     pub client: Client,
-    pub base_url: String,
+    pub chain: HyperliquidChain,
 }
 
 async fn parse_response(response: Response) -> Result<String> {
@@ -53,7 +53,7 @@ async fn parse_response(response: Response) -> Result<String> {
 
 impl HttpClient {
     pub async fn post(&self, url_path: &'static str, data: String) -> Result<String> {
-        let full_url = format!("{}{url_path}", self.base_url);
+        let full_url = format!("{}{url_path}", self.chain.url());
         let request = self
             .client
             .post(full_url)
@@ -70,6 +70,6 @@ impl HttpClient {
     }
 
     pub fn is_mainnet(&self) -> bool {
-        self.base_url == BaseUrl::Mainnet.get_url()
+        self.chain.is_mainnet()
     }
 }

@@ -3,8 +3,8 @@ use log::{error, info};
 use tokio::sync::mpsc::unbounded_channel;
 
 use crate::{
-    bps_diff, truncate_float, BaseUrl, ClientCancelRequest, ClientLimit, ClientOrder,
-    ClientOrderRequest, ExchangeClient, ExchangeDataStatus, ExchangeResponseStatus, InfoClient,
+    bps_diff, truncate_float, ClientCancelRequest, ClientLimit, ClientOrder, ClientOrderRequest,
+    ExchangeClient, ExchangeDataStatus, ExchangeResponseStatus, HyperliquidChain, InfoClient,
     Message, Subscription, UserData, EPSILON,
 };
 #[derive(Debug)]
@@ -46,11 +46,18 @@ impl MarketMaker {
     pub async fn new(input: MarketMakerInput) -> MarketMaker {
         let user_address = input.wallet.address();
 
-        let info_client = InfoClient::new(None, Some(BaseUrl::Testnet)).await.unwrap();
-        let exchange_client =
-            ExchangeClient::new(None, input.wallet, Some(BaseUrl::Testnet), None, None)
-                .await
-                .unwrap();
+        let info_client = InfoClient::new(None, Some(HyperliquidChain::Testnet))
+            .await
+            .unwrap();
+        let exchange_client = ExchangeClient::new(
+            None,
+            input.wallet,
+            Some(HyperliquidChain::Testnet),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         MarketMaker {
             asset: input.asset,

@@ -15,7 +15,7 @@ use crate::{
     prelude::*,
     req::HttpClient,
     ws::{Subscription, WsManager},
-    BaseUrl, Error, Message, OrderStatusResponse, ReferralResponse, UserFeesResponse,
+    Error, HyperliquidChain, Message, OrderStatusResponse, ReferralResponse, UserFeesResponse,
     UserFundingResponse, UserTokenBalanceResponse,
 };
 
@@ -104,27 +104,33 @@ pub struct InfoClient {
 }
 
 impl InfoClient {
-    pub async fn new(client: Option<Client>, base_url: Option<BaseUrl>) -> Result<InfoClient> {
+    pub async fn new(
+        client: Option<Client>,
+        base_url: Option<HyperliquidChain>,
+    ) -> Result<InfoClient> {
         Self::new_internal(client, base_url, false).await
     }
 
     pub async fn with_reconnect(
         client: Option<Client>,
-        base_url: Option<BaseUrl>,
+        base_url: Option<HyperliquidChain>,
     ) -> Result<InfoClient> {
         Self::new_internal(client, base_url, true).await
     }
 
     async fn new_internal(
         client: Option<Client>,
-        base_url: Option<BaseUrl>,
+        base_url: Option<HyperliquidChain>,
         reconnect: bool,
     ) -> Result<InfoClient> {
         let client = client.unwrap_or_default();
-        let base_url = base_url.unwrap_or(BaseUrl::Mainnet).get_url();
+        let base_url = base_url.unwrap_or(HyperliquidChain::Mainnet);
 
         Ok(InfoClient {
-            http_client: HttpClient { client, base_url },
+            http_client: HttpClient {
+                client,
+                chain: base_url,
+            },
             ws_manager: None,
             reconnect,
         })
@@ -137,7 +143,7 @@ impl InfoClient {
     ) -> Result<u32> {
         if self.ws_manager.is_none() {
             let ws_manager = WsManager::new(
-                format!("ws{}/ws", &self.http_client.base_url[4..]),
+                format!("ws{}/ws", &self.http_client.chain.url()[4..]),
                 self.reconnect,
             )
             .await?;
@@ -157,7 +163,7 @@ impl InfoClient {
     pub async fn unsubscribe(&mut self, subscription_id: u32) -> Result<()> {
         if self.ws_manager.is_none() {
             let ws_manager = WsManager::new(
-                format!("ws{}/ws", &self.http_client.base_url[4..]),
+                format!("ws{}/ws", &self.http_client.chain.url()[4..]),
                 self.reconnect,
             )
             .await?;

@@ -19,8 +19,8 @@ use crate::{
         sign_l1_action, sign_multi_sig_action, sign_multi_sig_l1_action_payload, sign_typed_data,
         sign_typed_data_multi_sig,
     },
-    BaseUrl, BulkCancelCloid, ClassTransfer, Error, ExchangeResponseStatus, MultiSigExtension,
-    SpotSend, SpotUser, VaultTransfer, Withdraw3,
+    BulkCancelCloid, ClassTransfer, Error, ExchangeResponseStatus, HyperliquidChain,
+    MultiSigExtension, SpotSend, SpotUser, VaultTransfer, Withdraw3,
 };
 use alloy::{
     hex,
@@ -183,12 +183,12 @@ impl ExchangeClient {
     pub async fn new(
         client: Option<Client>,
         wallet: PrivateKeySigner,
-        base_url: Option<BaseUrl>,
+        base_url: Option<HyperliquidChain>,
         meta: Option<Meta>,
         vault_address: Option<Address>,
     ) -> Result<ExchangeClient> {
         let client = client.unwrap_or_default();
-        let base_url = base_url.unwrap_or(BaseUrl::Mainnet);
+        let base_url = base_url.unwrap_or(HyperliquidChain::Mainnet);
 
         let info = InfoClient::new(None, Some(base_url)).await?;
         let meta = if let Some(meta) = meta {
@@ -213,7 +213,7 @@ impl ExchangeClient {
             vault_address,
             http_client: HttpClient {
                 client,
-                base_url: base_url.get_url(),
+                chain: base_url,
             },
             coin_to_asset,
             expires_after: None,
@@ -307,24 +307,17 @@ impl ExchangeClient {
         wallet: Option<&PrivateKeySigner>,
     ) -> Result<ExchangeResponseStatus> {
         let wallet = wallet.unwrap_or(&self.wallet);
-        let hyperliquid_chain = if self.http_client.is_mainnet() {
-            "Mainnet".to_string()
-        } else {
-            "Testnet".to_string()
-        };
+        let usd_send = UsdSend::new(
+            self.http_client.chain,
+            destination.to_lowercase(),
+            amount.to_string(),
+            None,
+        );
+        let timestamp = usd_send.time;
+        let signature = sign_typed_data(&usd_send, wallet)?;
+        let action = Actions::UsdSend(usd_send);
 
-        let timestamp = next_nonce();
-        let action = UsdSend {
-            signature_chain_id: 421614,
-            hyperliquid_chain,
-            destination: destination.to_lowercase(),
-            amount: amount.to_string(),
-            time: timestamp,
-        };
-        let signature = sign_typed_data(&action, wallet)?;
-
-        self.post(Actions::UsdSend(action), signature, timestamp)
-            .await
+        self.post(action, signature, timestamp).await
     }
 
     pub async fn class_transfer(
@@ -360,35 +353,26 @@ impl ExchangeClient {
     ) -> Result<ExchangeResponseStatus> {
         let wallet = wallet.unwrap_or(&self.wallet);
 
-        let hyperliquid_chain = if self.http_client.is_mainnet() {
-            "Mainnet".to_string()
-        } else {
-            "Testnet".to_string()
-        };
-
-        let timestamp = next_nonce();
-
         // Build fromSubAccount string (similar to Python SDK)
         let from_sub_account = self
             .vault_address
             .map_or_else(String::new, |vault_addr| format!("{vault_addr:?}"));
 
-        let action = SendAsset {
-            signature_chain_id: 421614,
-            hyperliquid_chain,
-            destination: destination.to_lowercase(),
-            source_dex: source_dex.to_string(),
-            destination_dex: destination_dex.to_string(),
-            token: token.to_string(),
-            amount: amount.to_string(),
+        let send_asset = SendAsset::new(
+            self.http_client.chain,
+            destination.to_lowercase(),
+            source_dex.to_string(),
+            destination_dex.to_string(),
+            token.to_string(),
+            amount.to_string(),
             from_sub_account,
-            nonce: timestamp,
-            multi_sig_ext: None,
-        };
+            None,
+            None,
+        );
+        let timestamp = send_asset.nonce;
+        let signature = sign_typed_data(&send_asset, wallet)?;
 
-        let signature = sign_typed_data(&action, wallet)?;
-
-        self.post(Actions::SendAsset(action), signature, timestamp)
+        self.post(Actions::SendAsset(send_asset), signature, timestamp)
             .await
     }
 
@@ -475,12 +459,7 @@ impl ExchangeClient {
         let slippage = params.slippage.unwrap_or(0.05); // Default 5% slippage
         let wallet = params.wallet.unwrap_or(&self.wallet);
 
-        let base_url = match self.http_client.base_url.as_str() {
-            "https://api.hyperliquid.xyz" => BaseUrl::Mainnet,
-            "https://api.hyperliquid-testnet.xyz" => BaseUrl::Testnet,
-            _ => return Err(Error::GenericRequest("Invalid base URL".to_string())),
-        };
-        let info_client = InfoClient::new(None, Some(base_url)).await?;
+        let info_client = InfoClient::new(None, Some(self.http_client.chain)).await?;
         let user_state = info_client.user_state(wallet.address()).await?;
 
         let position = user_state
@@ -523,12 +502,7 @@ impl ExchangeClient {
         slippage: f64,
         px: Option<f64>,
     ) -> Result<(f64, u32)> {
-        let base_url = match self.http_client.base_url.as_str() {
-            "https://api.hyperliquid.xyz" => BaseUrl::Mainnet,
-            "https://api.hyperliquid-testnet.xyz" => BaseUrl::Testnet,
-            _ => return Err(Error::GenericRequest("Invalid base URL".to_string())),
-        };
-        let info_client = InfoClient::new(None, Some(base_url)).await?;
+        let info_client = InfoClient::new(None, Some(self.http_client.chain)).await?;
         let meta = info_client.meta().await?;
 
         let asset_meta = meta
@@ -813,21 +787,8 @@ impl ExchangeClient {
     ) -> Result<(B256, ExchangeResponseStatus)> {
         let wallet = wallet.unwrap_or(&self.wallet);
         let agent = PrivateKeySigner::random();
-
-        let hyperliquid_chain = if self.http_client.is_mainnet() {
-            "Mainnet".to_string()
-        } else {
-            "Testnet".to_string()
-        };
-
-        let nonce = next_nonce();
-        let approve_agent = ApproveAgent {
-            signature_chain_id: 421614,
-            hyperliquid_chain,
-            agent_address: agent.address(),
-            agent_name: None,
-            nonce,
-        };
+        let approve_agent = ApproveAgent::new(self.http_client.chain, agent.address(), None, None);
+        let nonce = approve_agent.nonce;
         let signature = sign_typed_data(&approve_agent, wallet)?;
         let action = Actions::ApproveAgent(approve_agent);
         Ok((agent.to_bytes(), self.post(action, signature, nonce).await?))
@@ -840,20 +801,13 @@ impl ExchangeClient {
         wallet: Option<&PrivateKeySigner>,
     ) -> Result<ExchangeResponseStatus> {
         let wallet = wallet.unwrap_or(&self.wallet);
-        let hyperliquid_chain = if self.http_client.is_mainnet() {
-            "Mainnet".to_string()
-        } else {
-            "Testnet".to_string()
-        };
-
-        let timestamp = next_nonce();
-        let withdraw = Withdraw3 {
-            signature_chain_id: 421614,
-            hyperliquid_chain,
-            destination: destination.to_lowercase(),
-            amount: amount.to_string(),
-            time: timestamp,
-        };
+        let withdraw = Withdraw3::new(
+            self.http_client.chain,
+            destination.to_lowercase(),
+            amount.to_string(),
+            None,
+        );
+        let timestamp = withdraw.time;
         let signature = sign_typed_data(&withdraw, wallet)?;
         let action = Actions::Withdraw3(withdraw);
 
@@ -868,21 +822,14 @@ impl ExchangeClient {
         wallet: Option<&PrivateKeySigner>,
     ) -> Result<ExchangeResponseStatus> {
         let wallet = wallet.unwrap_or(&self.wallet);
-        let hyperliquid_chain = if self.http_client.is_mainnet() {
-            "Mainnet".to_string()
-        } else {
-            "Testnet".to_string()
-        };
-
-        let timestamp = next_nonce();
-        let spot_send = SpotSend {
-            signature_chain_id: 421614,
-            hyperliquid_chain,
-            destination: destination.to_lowercase(),
-            amount: amount.to_string(),
-            time: timestamp,
-            token: token.to_string(),
-        };
+        let spot_send = SpotSend::new(
+            self.http_client.chain,
+            destination.to_lowercase(),
+            token.to_string(),
+            amount.to_string(),
+            None,
+        );
+        let timestamp = spot_send.time;
         let signature = sign_typed_data(&spot_send, wallet)?;
         let action = Actions::SpotSend(spot_send);
 
@@ -913,21 +860,9 @@ impl ExchangeClient {
         wallet: Option<&PrivateKeySigner>,
     ) -> Result<ExchangeResponseStatus> {
         let wallet = wallet.unwrap_or(&self.wallet);
-        let timestamp = next_nonce();
-
-        let hyperliquid_chain = if self.http_client.is_mainnet() {
-            "Mainnet".to_string()
-        } else {
-            "Testnet".to_string()
-        };
-
-        let approve_builder_fee = ApproveBuilderFee {
-            signature_chain_id: 421614,
-            hyperliquid_chain,
-            builder,
-            max_fee_rate,
-            nonce: timestamp,
-        };
+        let approve_builder_fee =
+            ApproveBuilderFee::new(self.http_client.chain, builder, max_fee_rate, None);
+        let timestamp = approve_builder_fee.nonce;
         let signature = sign_typed_data(&approve_builder_fee, wallet)?;
         let action = Actions::ApproveBuilderFee(approve_builder_fee);
 
@@ -1005,20 +940,9 @@ impl ExchangeClient {
         wallet: Option<&PrivateKeySigner>,
     ) -> Result<ExchangeResponseStatus> {
         let wallet = wallet.unwrap_or(&self.wallet);
-        let timestamp = next_nonce();
-
-        let hyperliquid_chain = if self.http_client.is_mainnet() {
-            "Mainnet".to_string()
-        } else {
-            "Testnet".to_string()
-        };
-
-        let convert_to_multi_sig = ConvertToMultiSig {
-            signature_chain_id: 421614,
-            hyperliquid_chain,
-            multi_sig_threshold,
-            time: timestamp,
-        };
+        let convert_to_multi_sig =
+            ConvertToMultiSig::new(self.http_client.chain, multi_sig_threshold, None);
+        let timestamp = convert_to_multi_sig.time;
         let signature = sign_typed_data(&convert_to_multi_sig, wallet)?;
         let action = Actions::ConvertToMultiSig(convert_to_multi_sig);
 
@@ -1033,21 +957,9 @@ impl ExchangeClient {
         wallet: Option<&PrivateKeySigner>,
     ) -> Result<ExchangeResponseStatus> {
         let wallet = wallet.unwrap_or(&self.wallet);
-        let timestamp = next_nonce();
-
-        let hyperliquid_chain = if self.http_client.is_mainnet() {
-            "Mainnet".to_string()
-        } else {
-            "Testnet".to_string()
-        };
-
-        let update_multi_sig_addresses = UpdateMultiSigAddresses {
-            signature_chain_id: 421614,
-            hyperliquid_chain,
-            to_add,
-            to_remove,
-            time: timestamp,
-        };
+        let update_multi_sig_addresses =
+            UpdateMultiSigAddresses::new(self.http_client.chain, to_add, to_remove, None);
+        let timestamp = update_multi_sig_addresses.time;
         let signature = sign_typed_data(&update_multi_sig_addresses, wallet)?;
         let action = Actions::UpdateMultiSigAddresses(update_multi_sig_addresses);
 
@@ -1180,30 +1092,21 @@ impl ExchangeClient {
         destination: &str,
         wallets: &[PrivateKeySigner],
     ) -> Result<ExchangeResponseStatus> {
-        let hyperliquid_chain = if self.http_client.is_mainnet() {
-            "Mainnet".to_string()
-        } else {
-            "Testnet".to_string()
-        };
-
-        let timestamp = next_nonce();
-
-        let send_asset = SendAsset {
-            signature_chain_id: 421614,
-            hyperliquid_chain,
-            destination: destination.to_lowercase(),
-            source_dex: "".to_string(),
-            destination_dex: "".to_string(),
-            token: "USDC".to_string(),
-            amount: amount.to_string(),
-            from_sub_account: "".to_string(),
-            nonce: timestamp,
-            multi_sig_ext: Some(MultiSigExtension {
+        let send_asset = SendAsset::new(
+            self.http_client.chain,
+            destination.to_lowercase(),
+            "".to_string(),
+            "".to_string(),
+            "USDC".to_string(),
+            amount.to_string(),
+            "".to_string(),
+            Some(MultiSigExtension {
                 payload_multi_sig_user: format!("{:#x}", multi_sig_user).to_lowercase(),
                 outer_signer: format!("{:#x}", self.wallet.address()).to_lowercase(),
             }),
-        };
-
+            None,
+        );
+        let timestamp = send_asset.nonce;
         let signatures = sign_typed_data_multi_sig(&send_asset, wallets)?;
 
         self.post_multi_sig(
@@ -1224,30 +1127,21 @@ impl ExchangeClient {
         token: &str,
         wallets: &[PrivateKeySigner],
     ) -> Result<ExchangeResponseStatus> {
-        let hyperliquid_chain = if self.http_client.is_mainnet() {
-            "Mainnet".to_string()
-        } else {
-            "Testnet".to_string()
-        };
-
-        let timestamp = next_nonce();
-
-        let send_asset = SendAsset {
-            signature_chain_id: 421614,
-            hyperliquid_chain,
-            destination: destination.to_lowercase(),
-            source_dex: "".to_string(),
-            destination_dex: "".to_string(),
-            token: token.to_string(),
-            amount: amount.to_string(),
-            from_sub_account: "".to_string(),
-            nonce: timestamp,
-            multi_sig_ext: Some(MultiSigExtension {
+        let send_asset = SendAsset::new(
+            self.http_client.chain,
+            destination.to_lowercase(),
+            "".to_string(),
+            "".to_string(),
+            token.to_string(),
+            amount.to_string(),
+            "".to_string(),
+            Some(MultiSigExtension {
                 payload_multi_sig_user: format!("{:#x}", multi_sig_user).to_lowercase(),
                 outer_signer: format!("{:#x}", self.wallet.address()).to_lowercase(),
             }),
-        };
-
+            None,
+        );
+        let timestamp = send_asset.nonce;
         let signatures = sign_typed_data_multi_sig(&send_asset, wallets)?;
 
         self.post_multi_sig(
@@ -1318,29 +1212,21 @@ impl ExchangeClient {
         destination: &str,
         signatures: Vec<Signature>,
     ) -> Result<ExchangeResponseStatus> {
-        let hyperliquid_chain = if self.http_client.is_mainnet() {
-            "Mainnet".to_string()
-        } else {
-            "Testnet".to_string()
-        };
-
-        let timestamp = next_nonce();
-
-        let send_asset = SendAsset {
-            signature_chain_id: 421614,
-            hyperliquid_chain,
-            destination: destination.to_lowercase(),
-            source_dex: "".to_string(),
-            destination_dex: "".to_string(),
-            token: "USDC".to_string(),
-            amount: amount.to_string(),
-            from_sub_account: "".to_string(),
-            nonce: timestamp,
-            multi_sig_ext: Some(MultiSigExtension {
+        let send_asset = SendAsset::new(
+            self.http_client.chain,
+            destination.to_lowercase(),
+            "".to_string(),
+            "".to_string(),
+            "USDC".to_string(),
+            amount.to_string(),
+            "".to_string(),
+            Some(MultiSigExtension {
                 payload_multi_sig_user: format!("{:#x}", multi_sig_user).to_lowercase(),
                 outer_signer: format!("{:#x}", self.wallet.address()).to_lowercase(),
             }),
-        };
+            None,
+        );
+        let timestamp = send_asset.nonce;
 
         self.post_multi_sig(
             multi_sig_user,
@@ -1370,29 +1256,21 @@ impl ExchangeClient {
         token: &str,
         signatures: Vec<Signature>,
     ) -> Result<ExchangeResponseStatus> {
-        let hyperliquid_chain = if self.http_client.is_mainnet() {
-            "Mainnet".to_string()
-        } else {
-            "Testnet".to_string()
-        };
-
-        let timestamp = next_nonce();
-
-        let send_asset = SendAsset {
-            signature_chain_id: 421614,
-            hyperliquid_chain,
-            destination: destination.to_lowercase(),
-            source_dex: "".to_string(),
-            destination_dex: "".to_string(),
-            token: token.to_string(),
-            amount: amount.to_string(),
-            from_sub_account: "".to_string(),
-            nonce: timestamp,
-            multi_sig_ext: Some(MultiSigExtension {
+        let send_asset = SendAsset::new(
+            self.http_client.chain,
+            destination.to_lowercase(),
+            "".to_string(),
+            "".to_string(),
+            token.to_string(),
+            amount.to_string(),
+            "".to_string(),
+            Some(MultiSigExtension {
                 payload_multi_sig_user: format!("{:#x}", multi_sig_user).to_lowercase(),
                 outer_signer: format!("{:#x}", self.wallet.address()).to_lowercase(),
             }),
-        };
+            None,
+        );
+        let timestamp = send_asset.nonce;
 
         self.post_multi_sig(
             multi_sig_user,

@@ -1,5 +1,7 @@
 use alloy::{primitives::Address, signers::local::PrivateKeySigner};
-use hyperliquid_rust_sdk::{BaseUrl, ClientLimit, ClientOrder, ClientOrderRequest, ExchangeClient};
+use hyperliquid_rust_sdk::{
+    ClientLimit, ClientOrder, ClientOrderRequest, ExchangeClient, HyperliquidChain,
+};
 use log::info;
 
 fn setup_multi_sig_wallets() -> Vec<PrivateKeySigner> {
@@ -25,9 +27,10 @@ async fn setup_exchange_client() -> (Address, ExchangeClient) {
             .unwrap();
 
     let address = wallet.address();
-    let exchange_client = ExchangeClient::new(None, wallet, Some(BaseUrl::Testnet), None, None)
-        .await
-        .unwrap();
+    let exchange_client =
+        ExchangeClient::new(None, wallet, Some(HyperliquidChain::Testnet), None, None)
+            .await
+            .unwrap();
 
     (address, exchange_client)
 }
@@ -57,7 +60,7 @@ async fn main() {
     info!("Outer signer (current wallet): {}", address);
     info!(
         "Exchange client connected to: {:?}",
-        exchange_client.http_client.base_url
+        exchange_client.http_client.chain
     );
     info!(
         "Authorized wallets ({} total): {:?}",

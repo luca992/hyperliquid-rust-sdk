@@ -1,5 +1,5 @@
 use alloy::signers::local::PrivateKeySigner;
-use hyperliquid_rust_sdk::{BaseUrl, ExchangeClient, ExchangeResponseStatus};
+use hyperliquid_rust_sdk::{ExchangeClient, ExchangeResponseStatus, HyperliquidChain};
 use log::info;
 
 #[tokio::main]
@@ -11,9 +11,10 @@ async fn main() {
             .parse()
             .unwrap();
 
-    let exchange_client = ExchangeClient::new(None, wallet, Some(BaseUrl::Testnet), None, None)
-        .await
-        .unwrap();
+    let exchange_client =
+        ExchangeClient::new(None, wallet, Some(HyperliquidChain::Testnet), None, None)
+            .await
+            .unwrap();
 
     let response = exchange_client.claim_rewards(None).await.unwrap();
 

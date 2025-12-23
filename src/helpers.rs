@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use chrono::prelude::Utc;
@@ -71,18 +72,36 @@ pub fn bps_diff(x: f64, y: f64) -> u16 {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum BaseUrl {
+pub enum HyperliquidChain {
     Localhost,
     Testnet,
     Mainnet,
 }
 
-impl BaseUrl {
-    pub(crate) fn get_url(&self) -> String {
+impl HyperliquidChain {
+    pub(crate) fn url(&self) -> &'static str {
         match self {
-            BaseUrl::Localhost => LOCAL_API_URL.to_string(),
-            BaseUrl::Mainnet => MAINNET_API_URL.to_string(),
-            BaseUrl::Testnet => TESTNET_API_URL.to_string(),
+            HyperliquidChain::Localhost => LOCAL_API_URL,
+            HyperliquidChain::Mainnet => MAINNET_API_URL,
+            HyperliquidChain::Testnet => TESTNET_API_URL,
+        }
+    }
+
+    pub(crate) fn action_chain_name(&self) -> String {
+        self.to_string()
+    }
+
+    pub fn is_mainnet(&self) -> bool {
+        *self == HyperliquidChain::Mainnet
+    }
+}
+
+impl Display for HyperliquidChain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HyperliquidChain::Localhost => write!(f, "Localhost"),
+            HyperliquidChain::Mainnet => write!(f, "Mainnet"),
+            HyperliquidChain::Testnet => write!(f, "Testnet"),
         }
     }
 }

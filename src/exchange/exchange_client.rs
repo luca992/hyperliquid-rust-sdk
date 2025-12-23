@@ -138,7 +138,7 @@ pub enum Actions {
 
 #[derive(Serialize)]
 #[serde(untagged)]
-enum PostAction {
+pub enum PostAction {
     Std(Actions),
     MultiSig(MultiSigAction),
 }
@@ -241,7 +241,7 @@ impl ExchangeClient {
         )
     }
 
-    async fn post<PA: Into<PostAction>>(
+    pub async fn post<PA: Into<PostAction>>(
         &self,
         action: PA,
         signature: Signature,

@@ -1,4 +1,4 @@
-pub(crate) mod l1 {
+pub mod l1 {
     use alloy::{
         dyn_abi::Eip712Domain,
         primitives::{Address, B256},

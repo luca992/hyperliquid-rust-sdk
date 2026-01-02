@@ -5,7 +5,7 @@ use alloy::{
     signers::{local::PrivateKeySigner, Signature, SignerSync},
 };
 
-pub(crate) fn sign_l1_action(
+pub fn sign_l1_action(
     wallet: &PrivateKeySigner,
     connection_id: B256,
     is_mainnet: bool,
@@ -49,7 +49,7 @@ pub(crate) fn sign_typed_data_multi_sig<T: Eip712>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn sign_multi_sig_l1_action_payload(
+pub fn sign_multi_sig_l1_action_payload(
     wallets: &[PrivateKeySigner],
     action: &Actions,
     multi_sig_user: alloy::primitives::Address,
@@ -92,7 +92,7 @@ pub(crate) fn sign_multi_sig_l1_action_payload(
 /// 1. Removes the "type" field from the multi_sig_action
 /// 2. Computes the action hash using msgpack + nonce + vault_address + expires_after
 /// 3. Creates and signs the MultiSigEnvelope
-pub(crate) fn sign_multi_sig_action(
+pub fn sign_multi_sig_action(
     wallet: &PrivateKeySigner,
     multi_sig_action: &MultiSigAction,
     vault_address: Option<alloy::primitives::Address>,

@@ -16,6 +16,16 @@ pub(crate) mod l1 {
         }
     }
 
+    impl Agent {
+        pub fn new(is_mainnet: bool, connection_id: B256) -> Agent {
+            let source = if is_mainnet { "a" } else { "b" }.to_string();
+            Agent {
+                source,
+                connectionId: connection_id,
+            }
+        }
+    }
+
     impl Eip712 for Agent {
         fn domain(&self) -> Eip712Domain {
             eip712_domain! {

@@ -10,11 +10,7 @@ pub(crate) fn sign_l1_action(
     connection_id: B256,
     is_mainnet: bool,
 ) -> Result<Signature> {
-    let source = if is_mainnet { "a" } else { "b" }.to_string();
-    let payload = l1::Agent {
-        source,
-        connectionId: connection_id,
-    };
+    let payload = l1::Agent::new(is_mainnet, connection_id);
     sign_typed_data(&payload, wallet)
 }
 

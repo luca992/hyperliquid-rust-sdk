@@ -77,7 +77,7 @@ struct MultiSigPayload {
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct MultiSigAction {
+pub struct MultiSigAction {
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
     pub signature_chain_id: String,
@@ -156,7 +156,7 @@ impl From<MultiSigAction> for PostAction {
 }
 
 impl Actions {
-    fn hash(
+    pub fn hash(
         &self,
         timestamp: u64,
         vault_address: Option<Address>,

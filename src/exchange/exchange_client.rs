@@ -19,8 +19,8 @@ use crate::{
         sign_l1_action, sign_multi_sig_action, sign_multi_sig_l1_action_payload, sign_typed_data,
         sign_typed_data_multi_sig,
     },
-    BulkCancelCloid, ClassTransfer, Error, ExchangeResponseStatus, HyperliquidChain,
-    MultiSigExtension, SpotSend, SpotUser, VaultTransfer, Withdraw3,
+    BulkCancelCloid, Error, ExchangeResponseStatus, HyperliquidChain, MultiSigExtension, SpotSend,
+    UsdClassTransfer, VaultTransfer, Withdraw3,
 };
 use alloy::{
     hex,
@@ -123,7 +123,7 @@ pub enum Actions {
     BatchModify(BulkModify),
     ApproveAgent(ApproveAgent),
     Withdraw3(Withdraw3),
-    SpotUser(SpotUser),
+    UsdClassTransfer(UsdClassTransfer),
     SendAsset(SendAsset),
     VaultTransfer(VaultTransfer),
     SpotSend(SpotSend),
@@ -237,7 +237,7 @@ impl ExchangeClient {
                 | Actions::Withdraw3(_)
                 | Actions::SpotSend(_)
                 | Actions::SendAsset(_)
-                | Actions::SpotUser(_)
+                | Actions::UsdClassTransfer(_)
         )
     }
 
@@ -320,24 +320,19 @@ impl ExchangeClient {
         self.post(action, signature, timestamp).await
     }
 
-    pub async fn class_transfer(
+    pub async fn usd_class_transfer(
         &self,
-        usdc: f64,
+        amount: f64,
         to_perp: bool,
         wallet: Option<&PrivateKeySigner>,
     ) -> Result<ExchangeResponseStatus> {
-        // payload expects usdc without decimals
-        let usdc = (usdc * 1e6).round() as u64;
         let wallet = wallet.unwrap_or(&self.wallet);
 
-        let timestamp = next_nonce();
-
-        let action = Actions::SpotUser(SpotUser {
-            class_transfer: ClassTransfer { usdc, to_perp },
-        });
-        let connection_id = action.hash(timestamp, self.vault_address, self.expires_after)?;
-        let is_mainnet = self.http_client.is_mainnet();
-        let signature = sign_l1_action(wallet, connection_id, is_mainnet)?;
+        let usd_class_transfer =
+            UsdClassTransfer::new(self.http_client.chain, amount.to_string(), to_perp);
+        let timestamp = usd_class_transfer.nonce;
+        let signature = sign_typed_data(&usd_class_transfer, wallet)?;
+        let action = Actions::UsdClassTransfer(usd_class_transfer);
 
         self.post(action, signature, timestamp).await
     }

@@ -2,8 +2,8 @@ use crate::{
     exchange::{
         actions::{
             ApproveAgent, ApproveBuilderFee, BulkCancel, BulkModify, BulkOrder, ClaimRewards,
-            ConvertToMultiSig, EvmUserModify, ScheduleCancel, SendAsset, SetReferrer,
-            UpdateIsolatedMargin, UpdateLeverage, UpdateMultiSigAddresses, UsdSend,
+            ConvertToMultiSig, CreateSubAccount, EvmUserModify, ScheduleCancel, SendAsset,
+            SetReferrer, UpdateIsolatedMargin, UpdateLeverage, UpdateMultiSigAddresses, UsdSend,
         },
         cancel::{CancelRequest, CancelRequestCloid, ClientCancelRequestCloid},
         modify::{ClientModifyRequest, ModifyRequest},
@@ -128,6 +128,7 @@ pub enum Actions {
     VaultTransfer(VaultTransfer),
     SpotSend(SpotSend),
     SetReferrer(SetReferrer),
+    CreateSubAccount(CreateSubAccount),
     ApproveBuilderFee(ApproveBuilderFee),
     EvmUserModify(EvmUserModify),
     ScheduleCancel(ScheduleCancel),
@@ -845,6 +846,25 @@ impl ExchangeClient {
 
         let is_mainnet = self.http_client.is_mainnet();
         let signature = sign_l1_action(wallet, connection_id, is_mainnet)?;
+        self.post(action, signature, timestamp).await
+    }
+
+    /// Create a sub-account under the master account.
+    ///
+    /// On success, the sub-account address is returned in the exchange response.
+    pub async fn create_sub_account(
+        &self,
+        name: String,
+        wallet: Option<&PrivateKeySigner>,
+    ) -> Result<ExchangeResponseStatus> {
+        let wallet = wallet.unwrap_or(&self.wallet);
+        let timestamp = next_nonce();
+
+        let action = Actions::CreateSubAccount(CreateSubAccount { name });
+        let connection_id = action.hash(timestamp, self.vault_address, self.expires_after)?;
+        let is_mainnet = self.http_client.is_mainnet();
+        let signature = sign_l1_action(wallet, connection_id, is_mainnet)?;
+
         self.post(action, signature, timestamp).await
     }
 

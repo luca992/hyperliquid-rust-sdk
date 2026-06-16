@@ -435,6 +435,12 @@ pub struct SetReferrer {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct CreateSubAccount {
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct EvmUserModify {
     pub using_big_blocks: bool,
 }

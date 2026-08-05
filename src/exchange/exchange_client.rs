@@ -3,7 +3,8 @@ use crate::{
         actions::{
             ApproveAgent, ApproveBuilderFee, BulkCancel, BulkModify, BulkOrder, ClaimRewards,
             ConvertToMultiSig, CreateSubAccount, EvmUserModify, ScheduleCancel, SendAsset,
-            SetReferrer, UpdateIsolatedMargin, UpdateLeverage, UpdateMultiSigAddresses, UsdSend,
+            SetReferrer, SubAccountSpotTransfer, SubAccountTransfer, UpdateIsolatedMargin,
+            UpdateLeverage, UpdateMultiSigAddresses, UsdSend,
         },
         cancel::{CancelRequest, CancelRequestCloid, ClientCancelRequestCloid},
         modify::{ClientModifyRequest, ModifyRequest},
@@ -129,6 +130,8 @@ pub enum Actions {
     SpotSend(SpotSend),
     SetReferrer(SetReferrer),
     CreateSubAccount(CreateSubAccount),
+    SubAccountTransfer(SubAccountTransfer),
+    SubAccountSpotTransfer(SubAccountSpotTransfer),
     ApproveBuilderFee(ApproveBuilderFee),
     EvmUserModify(EvmUserModify),
     ScheduleCancel(ScheduleCancel),

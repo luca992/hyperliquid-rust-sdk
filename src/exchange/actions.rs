@@ -439,6 +439,27 @@ pub struct CreateSubAccount {
     pub name: String,
 }
 
+/// Moves perp USD between a master account and one of its sub-accounts.
+/// `usd` is an integer amount of USD scaled by 1e6.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SubAccountTransfer {
+    pub sub_account_user: String,
+    pub is_deposit: bool,
+    pub usd: u64,
+}
+
+/// Moves a spot token between a master account and one of its sub-accounts.
+/// `token` is the `NAME:tokenId` pair and `amount` a decimal string.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SubAccountSpotTransfer {
+    pub sub_account_user: String,
+    pub is_deposit: bool,
+    pub token: String,
+    pub amount: String,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct EvmUserModify {
